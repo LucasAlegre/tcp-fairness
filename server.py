@@ -1,9 +1,12 @@
 from socket import * 
 import argparse
+import time
+import matplotlib.pyplot as plt
+
 
 prs = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                 description="""TCP Server""")                   
-prs.add_argument("-port", dest="port", type=int, help="Server port.\n")
+prs.add_argument("-port", dest="port", type=int, required=True, help="Server port.\n")
 args = prs.parse_args()
 
 # Create a TCP server socket
@@ -16,15 +19,27 @@ serverPort = args.port
 serverSocket.bind(('127.0.0.1', serverPort))
 
 serverSocket.listen(1)
-while True:
-    print('The server is ready to receive')
+print('The server is ready to receive')
+total_bytes = 0
+timer = 0
+statistics = []
+conn, addr = serverSocket.accept()
+with conn:
+    print('Connected by: ' + str(addr))
 
-    conn, addr = serverSocket.accept()
-    with conn:
-        print('Connected by: ' + str(addr))
-        while True:
-            data = conn.recv(1024)
-            if data:
-                print(repr(data))
+    while True:
+        data = conn.recv(2000)
+        total_bytes += len(data)
+				
+        timer += time.time()
+				
+        if timer % 1000 == 0:
+            print('Read ' + str(total_bytes) + ' bytes.')
+            statistics.append(total_bytes)
+            total_bytes = 0
+            if timer > 20000:
+                plt.figure()
+                plt.plot(statistics)
+                plt.show()
 
 serverSocket.close()  
