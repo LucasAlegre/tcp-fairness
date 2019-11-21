@@ -1,45 +1,80 @@
-from socket import * 
+
+import os
+import errno
 import argparse
 import time
-import matplotlib.pyplot as plt
+import csv
+from threading import Thread
+from socket import * 
 
+DELTA = 0.1
 
-prs = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                description="""TCP Server""")                   
-prs.add_argument("-port", dest="port", type=int, required=True, help="Server port.\n")
-args = prs.parse_args()
+def log_to_csv(log, client_addr):
+	path = 'results/' + "client_" + client_addr[0].replace('.', '-') + "_" + str(client_addr[1]) + ".csv"
+	with open(path, mode='w') as csv_log:
+		log_writer = csv.writer(csv_log, delimiter=',')
+		log_writer.writerow(["time", "bits/s"])
+		for row in log:
+			log_writer.writerow(row)
 
-# Create a TCP server socket
-#(AF_INET is used for IPv4 protocols)
-#(SOCK_STREAM is used for TCP)
-serverSocket = socket(AF_INET, SOCK_STREAM)
-serverPort = args.port
-
-# Bind the socket to server address and server port
-serverSocket.bind(('127.0.0.1', serverPort))
-
-serverSocket.listen(1)
-print('The server is ready to receive')
-total_bytes = 0
-timer = 0
-statistics = []
-conn, addr = serverSocket.accept()
-with conn:
+def listen_to_client(connection, addr):
     print('Connected by: ' + str(addr))
 
-    while True:
-        data = conn.recv(2000)
-        total_bytes += len(data)
-				
-        timer += time.time()
-				
-        if timer % 1000 == 0:
-            print('Read ' + str(total_bytes) + ' bytes.')
-            statistics.append(total_bytes)
-            total_bytes = 0
-            if timer > 20000:
-                plt.figure()
-                plt.plot(statistics)
-                plt.show()
+    bytes_read = 0
+    log = []
 
-serverSocket.close()  
+    prev_time = time.time()
+    elapsed_time = prev_time
+    while True:
+        try:
+            data = connection.recv(65536)
+            bytes_read += len(data)
+            if not data:
+                print('Client', addr, 'exited.')
+                break
+        except:
+            print('Client', addr, 'exited.')
+            break
+            
+        elapsed_time = time.time() - prev_time
+        if elapsed_time >= DELTA:
+            bits_per_sec = (bytes_read*8)/elapsed_time
+            bytes_read = 0
+            prev_time = time.time()
+            elapsed_time = prev_time
+            log.append([elapsed_time, bits_per_sec])
+
+    connection.close()
+
+    log_to_csv(log, addr)
+
+def run_server(port):
+    #(AF_INET is used for IPv4 protocols)
+    #(SOCK_STREAM is used for TCP)
+    serverSocket = socket(AF_INET, SOCK_STREAM)
+
+    # Bind the socket to server address and server port
+    serverSocket.bind(('127.0.0.1', port))
+
+    serverSocket.listen(1)
+    print('The server is ready to receive')
+
+    threads = []
+    while True:
+        conn, addr = serverSocket.accept()
+        t = Thread(target=listen_to_client, args=[conn, addr])
+        threads.append(t)
+        t.start()
+    serverSocket.close()
+
+if __name__ == '__main__':
+
+    prs = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                    description="""TCP Server""")                   
+    prs.add_argument("-port", dest="port", type=int, default=60000, help="Server port.\n")
+    args = prs.parse_args()
+
+    run_server(args.port)
+
+
+    
