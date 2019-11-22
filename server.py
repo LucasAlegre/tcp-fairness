@@ -39,6 +39,7 @@ def listen_to_client(connection, addr):
         elapsed_time = time.time() - prev_time
         if elapsed_time >= DELTA:
             bits_per_sec = (bytes_read*8)/elapsed_time
+            print(str(addr) + ' Bits/s: ' + str(bits_per_sec))
             bytes_read = 0
             prev_time = time.time()
             elapsed_time = prev_time
@@ -54,9 +55,9 @@ def run_server(port):
     serverSocket = socket(AF_INET, SOCK_STREAM)
 
     # Bind the socket to server address and server port
-    serverSocket.bind(('127.0.0.1', port))
+    serverSocket.bind(('', port))
 
-    serverSocket.listen(1)
+    serverSocket.listen(10)
     print('The server is ready to receive')
 
     threads = []
